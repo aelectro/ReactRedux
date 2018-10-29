@@ -3,13 +3,17 @@ import {connect} from 'react-redux';
 import {bindActionCreators} from 'redux';
 import * as courseActions from '../../actions/courseActions';
 import CourseForm from './CourseForm';
-class ManageCoursePage extends React.Component {
+import toastr from 'toastr';
+import authorsFormattedForDropdown from '../common/selectors/selector';
+
+export class ManageCoursePage extends React.Component {
 
   constructor(props, context) {
     super(props, context);
     this.state = {
       course: Object.assign({}, this.props.course),
-      errors: {}
+      errors: {},
+      saving: false
     };
     this.updateCourseState = this.updateCourseState.bind(this);
     this.onSave = this.onSave.bind(this);
@@ -29,10 +33,37 @@ class ManageCoursePage extends React.Component {
     this.setState({course: course});
   }
 
+  courseFormIsValid() {
+    let formIsValid = true;
+    let errors = {};
+    if(this.state.course.title.length < 5) {
+      errors.title = "Title must be at least 5 characters.";
+      formIsValid = false;
+    }
+
+    this.setState({errors: errors});
+    return formIsValid;
+  }
+
   onSave(event) {
     event.preventDefault();
-    this.props.actions.saveCourse(this.state.course);
+
+    if(!this.courseFormIsValid()) {
+      return;
+    }
+
+    this.setState({saving: true});
+    this.props.actions.saveCourse(this.state.course)
+    .then(() => this.redirect())
+    .catch(() => {
+      toastr.error("Title must be at least one characters.");
+      this.setState({saving: false});
+    })
+  }
+
+  redirect() {
     this.context.router.push('courses');
+    toastr.success('Course Saved!');
   }
 
   render() {
@@ -41,7 +72,8 @@ class ManageCoursePage extends React.Component {
                   onChange={this.updateCourseState}
                   onSave={this.onSave}
                   allAuthors={this.props.authors}
-                  errors={this.state.errors} />
+                  errors={this.state.errors}
+                  saving={this.state.saving} />
     );
   }
 }
@@ -68,16 +100,9 @@ function mapStateToProps(state, ownProps) {
   if(courseId && state.courses.length > 0) {
     course = getCourseById(state.courses, courseId);
   }
-
-  const authorsFormattedForDropdown = state.authors.map(author => {
-    return {
-      value: author.id,
-      text: author.firstName + ' ' + author.lastName
-    };
-  });
   return {
     course: course,
-    authors: authorsFormattedForDropdown
+    authors: authorsFormattedForDropdown(state.authors)
   };
 }
 
